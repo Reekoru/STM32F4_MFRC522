@@ -543,6 +543,8 @@ bool MFRC522_Exec_SelfTest(MFRC522_Handle_t *handle, uint8_t *selfTestResult)
 
     bool passed = (memcmp(test_result, mfrc522_v2_self_test, 64) == 0);
 
+    memcpy(selfTestResult, test_result, 64);
+
     // Restore STATE
     MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_Idle);
     MFRC522_WriteRegister(handle, MFRC522_TxModeReg, 0x00);
