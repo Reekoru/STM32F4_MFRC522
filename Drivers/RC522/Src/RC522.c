@@ -364,7 +364,6 @@ MFRC522_Status_t MFRC522_RequestA(MFRC522_Handle_t *handle, uint8_t *bufferATQA)
 
             if (HAL_GetTick() > timeout || (out & 0x01U)) { // Timeout
                 MFRC522_ClearBitMask(handle, MFRC522_BitFramingReg, 0x80U);
-                DEBUG_LOG("Timeout waiting for card\r\n");
                 status = MFRC522_TIMEOUT;
                 goto RequestA_End;
             }
@@ -405,7 +404,7 @@ MFRC522_Status_t MFRC522_RequestA(MFRC522_Handle_t *handle, uint8_t *bufferATQA)
     RequestA_End:
     MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_Idle);
 
-    if( status != MFRC522_OK) 
+    if ((status != MFRC522_OK) && (status != MFRC522_TIMEOUT) && (status != MFRC522_COLLISION)) 
     {
         DEBUG_LOG("RequestA failed...");
         MFRC522_Disable_Antenna(handle);
@@ -590,6 +589,52 @@ MFRC522_Status_t MFRC522_AntiCollision(MFRC522_Handle_t *handle, uint8_t *serNum
     return status;
 }
 
+/*****************************
+    MIFARE Classic functions
+*****************************/
+MFRC522_Status_t MFRC522_MifareAuth(MFRC522_Handle_t *handle, MIFARE_Command_t cmd, uint8_t blockAddr, uint8_t *key, uint8_t *uid)
+{
+    MFRC522_Status_t status = MFRC522_OK;
+
+    // https://www.nxp.com/docs/en/data-sheet/MFRC522.pdf: Section 10.3.1.9 - MFAuthent command
+    // | Byte 0 | Byte 1 | Byte 2-7       | Byte 8-11       |
+    // |--------|--------|-----------------|----------------|
+    // | cmd    | block  | Key (6 bytes)  | UID (4 bytes)   |
+    uint8_t buffer[12] = {0};
+    buffer[0] = cmd;
+    buffer[1] = blockAddr;
+    memcpy(&buffer[2], key, 6);
+    memcpy(&buffer[8], uid, 4);
+
+    MFRC522_Enable_Antenna(handle);
+    MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_Idle);
+    MFRC522_WriteRegister(handle, MFRC522_CommIrqReg, 0x7F);      // Clear IRQs
+    MFRC522_WriteRegister(handle, MFRC522_FIFOLevelReg, 0x80);   // Flush FIFO
+    MFRC522_WriteRegister(handle, MFRC522_BitFramingReg, 0x00);
+    MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_MFAuthent);
+
+    MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_Transceive);
+    MFRC522_SetBitMask(handle, MFRC522_BitFramingReg, 0x80); // 3) Transmite SEL and NVB
+
+    uint32_t timeout = HAL_GetTick() + 30U;
+    while (1) {
+        uint8_t irq = 0;
+        MFRC522_ReadRegister(handle, MFRC522_CommIrqReg, &irq);
+        if (irq & 0x30U) { // RxIRq or IdleIRq
+            break;
+        }
+        if (irq & 0x01U || HAL_GetTick() > timeout) { // Timeout
+            MFRC522_ClearBitMask(handle, MFRC522_BitFramingReg, 0x80U);
+            DEBUG_LOG("Timeout during MIFARE Auth\r\n");
+            status = MFRC522_TIMEOUT;
+            goto MifareAuth_End;
+        }
+    }   
+
+    MifareAuth_End:
+    MFRC522_Disable_Antenna(handle);
+    return status;
+}
 
 /**************************
     Convenience functions

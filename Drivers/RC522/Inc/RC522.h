@@ -137,10 +137,11 @@ MFRC522_Status_t MFRC522_CalculateCRC(MFRC522_Handle_t *handle, uint8_t* data, u
 /*********************************
     Communication with PIC
 **********************************/
-
 MFRC522_Status_t MFRC522_RequestA(MFRC522_Handle_t *handle, uint8_t *bufferATQA);
 MFRC522_Status_t MFRC522_AntiCollistion(MFRC522_Handle_t *handle, uint8_t *bufferUID);
 MFRC522_Status_t MFRC522_SendREQA(MFRC522_Handle_t *handle);
+MFRC522_Status_t MFRC522_Tranceive(MFRC522_Handle_t *handle, uint8_t *sendData, uint16_t sendLen, uint8_t *backData, uint16_t *backLen);
+MFRC522_Status_t MFRC522_Tranceive_Command(MFRC522_Handle_t *handle, uint8_t cmd, uint8_t *sendData, uint16_t sendLen, uint8_t *backData, uint16_t *backLen);
 
 /*****************************
     MIFARE Classic functions

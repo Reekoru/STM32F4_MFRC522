@@ -11,7 +11,7 @@ static void _SelfTest(MFRC522_Handle_t *mfrc522);
 static void _VersionNumber(MFRC522_Handle_t *mfrc522);
 static void _ReadUID(MFRC522_Handle_t *mfrc522);
 static void _ReadUIDIRQ(MFRC522_Handle_t *mfrc522);
-
+static void _ReadWrite(MFRC522_Handle_t *mfrc522);
 /********************************
     For IRQ Example
 ********************************/
@@ -37,6 +37,9 @@ void Examples_Run(MFRC522_Handle_t *mfrc522, MCRF522_Example_t example)
         case Example_VersionNumber:
             _VersionNumber(mfrc522);
             break;
+        case Example_ReadWrite:
+            _ReadWrite(mfrc522);
+            break;
         default:
             DEBUG_LOG("Unknown example selected\r\n");
             break;
@@ -50,30 +53,19 @@ void _ReadUID(MFRC522_Handle_t *mfrc522)
     DEBUG_LOG("Running ReadUID Polling Example\r\n");
     while (1)
     {
-        if(MFRC522_IsCardPresent(mfrc522) == MFRC522_OK)
-        {
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
-            if(MFRC522_ReadUID(mfrc522) == MFRC522_OK) {
-                DEBUG_LOG("Card UID: %02X %02X %02X %02X\r\n", mfrc522->uid[0], mfrc522->uid[1], mfrc522->uid[2], mfrc522->uid[3]);
-            } else {
-                DEBUG_LOG("Failed to read card UID\r\n");
-            }
-            HAL_Delay(1000);
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
-            HAL_Delay(200);
-        }
-        else
-        {
-            HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
-            HAL_Delay(50);
-        }
+        if (MFRC522_IsCardPresent(mfrc522) != MFRC522_OK) continue;
+        if (MFRC522_ReadUID(mfrc522) != MFRC522_OK) continue;
+
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
+        DEBUG_LOG("Card UID: %02X %02X %02X %02X\r\n", mfrc522->uid[0], mfrc522->uid[1], mfrc522->uid[2], mfrc522->uid[3]);
+        HAL_Delay(1000);
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+        HAL_Delay(200);
     }
 }
 
 void _ReadUIDIRQ(MFRC522_Handle_t *mfrc522)
 {
-    uint8_t atqa[2] = {0};
-
     MFRC522_WriteRegister(mfrc522, MFRC522_CommandReg, MFRC522_CMD_Idle);
     MFRC522_WriteRegister(mfrc522, MFRC522_CommIrqReg, 0x7F);
 
@@ -95,14 +87,11 @@ void _ReadUIDIRQ(MFRC522_Handle_t *mfrc522)
 
         if (mfrc522_irqFlag) 
         {
-            if(MFRC522_IsCardPresent(mfrc522) == MFRC522_OK) 
-            {
-                if (MFRC522_ReadUID(mfrc522) == MFRC522_OK) 
-                {
-                    DEBUG_LOG("Card UID: %02X %02X %02X %02X\r\n", mfrc522->uid[0], mfrc522->uid[1], mfrc522->uid[2], mfrc522->uid[3]);
-                    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-                }
-            }
+            if(MFRC522_IsCardPresent(mfrc522) != MFRC522_OK) continue;
+            if (MFRC522_ReadUID(mfrc522) != MFRC522_OK) continue;
+            
+            DEBUG_LOG("Card UID: %02X %02X %02X %02X\r\n", mfrc522->uid[0], mfrc522->uid[1], mfrc522->uid[2], mfrc522->uid[3]);
+            HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 
             MFRC522_WriteRegister(mfrc522, MFRC522_CommandReg, MFRC522_CMD_Idle);
             MFRC522_WriteRegister(mfrc522, MFRC522_CommIrqReg, 0x7F);
@@ -111,20 +100,34 @@ void _ReadUIDIRQ(MFRC522_Handle_t *mfrc522)
     }
 }
 
+void _ReadWrite(MFRC522_Handle_t *mfrc522)
+{
+    DEBUG_LOG("Running ReadWrite Example\r\n");
+    while(1)
+    {
+        if(MFRC522_IsCardPresent(mfrc522) != MFRC522_OK) continue;
+        if(MFRC522_ReadUID(mfrc522) != MFRC522_OK) continue;
+        
+        uint8_t block = 4;
+        uint8_t keyA[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // Default key for MIFARE Classic
+        MFRC522_Status_t status = MFRC522_MifareAuth(mfrc522, MIFARE_CMD_AUTH_KEY_A, block, keyA, mfrc522->uid);
+        
+        if (status == MFRC522_OK) {
+            DEBUG_LOG("Authentication successful for block %d\r\n", block);
+        } else {
+            DEBUG_LOG("Authentication failed for block %d: %d\r\n", block, status);
+        }
+    }
+}
+
 void _SelfTest(MFRC522_Handle_t *mfrc522)
 {
     DEBUG_LOG("Running Self Test Example\r\n");
     uint8_t selfTestResult[64] = {0};
-    if(MFRC522_Exec_SelfTest(mfrc522, selfTestResult)) 
-    {
-        DEBUG_LOG("MFRC522 Self Test Passed.\r\n");
-        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-    } 
-    else 
-    {
-        DEBUG_LOG("MFRC522 Self Test Failed.\r\n");
-        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-    }
+
+    MFRC522_Status_t status = MFRC522_Exec_SelfTest(mfrc522, selfTestResult);
+    DEBUG_LOG("MFRC522 Self-test result: %d\r\n", status == MFRC522_OK);
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, status == MFRC522_OK);
 
     DEBUG_LOG_HEX("Result:", selfTestResult, 64);
 }
