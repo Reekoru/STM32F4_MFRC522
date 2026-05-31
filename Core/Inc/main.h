@@ -63,6 +63,9 @@ void Error_Handler(void);
 #define MFRC522_RST_GPIO_Port GPIOC
 #define SPI2_CS_Pin GPIO_PIN_3
 #define SPI2_CS_GPIO_Port GPIOC
+#define MFRC522_EXTI_Pin GPIO_PIN_1
+#define MFRC522_EXTI_GPIO_Port GPIOA
+#define MFRC522_EXTI_EXTI_IRQn EXTI1_IRQn
 #define USART_TX_Pin GPIO_PIN_2
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
