@@ -9,12 +9,13 @@
 ********************************/
 static void _SelfTest(MFRC522_Handle_t *mfrc522);
 static void _VersionNumber(MFRC522_Handle_t *mfrc522);
-static void _ReadUIDPoll(MFRC522_Handle_t *mfrc522);
+static void _ReadUID(MFRC522_Handle_t *mfrc522);
 static void _ReadUIDIRQ(MFRC522_Handle_t *mfrc522);
 
-// Private Vars
-static volatile uint8_t mfrc522_irqFlag = 0;
-    
+/********************************
+    For IRQ Example
+********************************/
+static volatile uint8_t mfrc522_irqFlag = 0; 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     if (GPIO_Pin == MFRC522_EXTI_Pin) {
         mfrc522_irqFlag = 1;
@@ -24,8 +25,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 void Examples_Run(MFRC522_Handle_t *mfrc522, MCRF522_Example_t example) 
 {
     switch (example) {
-        case Example_ReadUIDPoll:
-            _ReadUIDPoll(mfrc522);
+        case Example_ReadUID:
+            _ReadUID(mfrc522);
             break;
         case Example_ReadUIDIRQ:
             _ReadUIDIRQ(mfrc522);
@@ -44,7 +45,7 @@ void Examples_Run(MFRC522_Handle_t *mfrc522, MCRF522_Example_t example)
     DEBUG_LOG("Example finished\r\n");
 }
 
-void _ReadUIDPoll(MFRC522_Handle_t *mfrc522)
+void _ReadUID(MFRC522_Handle_t *mfrc522)
 {
     DEBUG_LOG("Running ReadUID Polling Example\r\n");
     while (1)

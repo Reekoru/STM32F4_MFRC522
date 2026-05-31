@@ -17,6 +17,15 @@ const uint8_t mfrc522_v2_self_test[64] = {
 
 uint8_t atqa[2];
 
+/**
+    @brief Initialize the MFRC522 module. This should be called before calling any other function.
+    @param handle Pointer to MFRC522 handle struct.
+    @param hspi Pointer to an initialized SPI handle for communication.
+    @param cdPort GPIO port for chip select (CS) pin.
+    @param cdPin GPIO pin for chip select (CS).
+    @param rstPort GPIO port for reset (RST) pin.
+    @param rstPin GPIO pin for reset (RST).
+ */
 MFRC522_Status_t MFRC522_Init(MFRC522_Handle_t *handle, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cdPort, uint16_t cdPin, GPIO_TypeDef *rstPort, uint16_t rstPin)
 {
     if (handle == NULL || hspi == NULL || cdPort == NULL || rstPort == NULL) {
@@ -69,6 +78,12 @@ MFRC522_Status_t MFRC522_Init(MFRC522_Handle_t *handle, SPI_HandleTypeDef *hspi,
     return MFRC522_OK;
 }
 
+/**
+    @brief Write a value to a MFRC522 register.
+    @param handle Pointer to MFRC522 handle struct.
+    @param reg Register to write to.
+    @param value Value to write.
+ */
 HAL_StatusTypeDef MFRC522_WriteRegister(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t value)
 {
     HAL_StatusTypeDef ret = HAL_OK;
@@ -107,6 +122,12 @@ HAL_StatusTypeDef MFRC522_WriteRegisterLong(MFRC522_Handle_t *handle, MFRC522_Re
     return ret;
 }
 
+/**
+    @brief Read a value from a MFRC522 register.
+    @param handle Pointer to MFRC522 handle struct.
+    @param reg Register to read from.
+    @param out (Output) Pointer to store the read value.
+ */
 HAL_StatusTypeDef MFRC522_ReadRegister(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* out)
 {
     HAL_StatusTypeDef ret = HAL_OK;
@@ -126,6 +147,13 @@ HAL_StatusTypeDef MFRC522_ReadRegister(MFRC522_Handle_t *handle, MFRC522_Registe
     return ret;
 }
 
+/**
+    @brief Read multiple values from a MFRC522 register.
+    @param handle Pointer to MFRC522 handle struct.
+    @param reg Register to read from.
+    @param out (Output) Pointer to store the read values.
+    @param length Number of bytes to read.
+ */
 HAL_StatusTypeDef MFRC522_ReadRegisterLong(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* out, uint16_t length)
 {
     if ((handle == NULL) || (handle->hspi == NULL) || (handle->cdPort == NULL) || (out == NULL) || (length == 0U)) {
@@ -157,6 +185,12 @@ HAL_StatusTypeDef MFRC522_ReadRegisterLong(MFRC522_Handle_t *handle, MFRC522_Reg
     return ret;
 }
 
+/**
+    @brief Set specific bits in a MFRC522 register.
+    @param handle Pointer to MFRC522 handle struct.
+    @param reg Register to modify.
+    @param mask Bit mask indicating which bits to set (1 = set, 0 = leave unchanged).
+ */
 HAL_StatusTypeDef MFRC522_SetBitMask(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t mask)
 {
     uint8_t value = 0;
@@ -169,6 +203,12 @@ HAL_StatusTypeDef MFRC522_SetBitMask(MFRC522_Handle_t *handle, MFRC522_Register_
     return MFRC522_WriteRegister(handle, reg, value);
 }
 
+/**
+    @brief Clear specific bits in a MFRC522 register.
+    @param handle Pointer to MFRC522 handle struct.
+    @param reg Register to modify.
+    @param mask Bit mask indicating which bits to clear (1 = clear, 0 = leave unchanged).
+ */
 HAL_StatusTypeDef MFRC522_ClearBitMask(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t mask)
 {
     uint8_t value = 0;
@@ -181,6 +221,10 @@ HAL_StatusTypeDef MFRC522_ClearBitMask(MFRC522_Handle_t *handle, MFRC522_Registe
     return MFRC522_WriteRegister(handle, reg, value);
 }
 
+/**
+    @brief Enable the MFRC522 antenna.
+    @param handle Pointer to MFRC522 handle struct.
+ */
 MFRC522_Status_t MFRC522_Enable_Antenna(MFRC522_Handle_t *handle)
 {
     HAL_StatusTypeDef ret = MFRC522_SetBitMask(handle, MFRC522_TxControlReg, 0x03U);
@@ -193,6 +237,10 @@ MFRC522_Status_t MFRC522_Enable_Antenna(MFRC522_Handle_t *handle)
     return ret;
 }
 
+/**
+    @brief Disable the MFRC522 antenna.
+    @param handle Pointer to MFRC522 handle struct.
+ */
 MFRC522_Status_t MFRC522_Disable_Antenna(MFRC522_Handle_t *handle)
 {
     HAL_StatusTypeDef ret = MFRC522_ClearBitMask(handle, MFRC522_TxControlReg, 0x03U);
@@ -205,6 +253,13 @@ MFRC522_Status_t MFRC522_Disable_Antenna(MFRC522_Handle_t *handle)
     return ret;
 }
 
+/**
+    @brief Generate CRC.
+    @param handle Pointer to MFRC522 handle struct.
+    @param data Pointer to the data buffer.
+    @param length Length of the data buffer.
+    @param out (Output) Pointer to store the calculated CRC.
+ */
 MFRC522_Status_t MFRC522_CalculateCRC(MFRC522_Handle_t *handle, uint8_t *data, uint16_t length, uint8_t *out)
 {
     MFRC522_Status_t status = MFRC522_OK;
@@ -253,6 +308,10 @@ MFRC522_Status_t MFRC522_CalculateCRC(MFRC522_Handle_t *handle, uint8_t *data, u
 /***********************************************************
  PICC functions
 ***********************************************************/
+/**
+    @brief Send REQA command. Used to activate PICC to utilize IRQ.
+    @param handle Pointer to MFRC522 handle struct.
+ */
 MFRC522_Status_t MFRC522_SendREQA(MFRC522_Handle_t *handle)
 {
     MFRC522_Enable_Antenna(handle);
@@ -266,6 +325,12 @@ MFRC522_Status_t MFRC522_SendREQA(MFRC522_Handle_t *handle)
 
     return MFRC522_OK;
 }
+
+/**
+    @brief Send a REQA command to the PIC.
+    @param handle Pointer to MFRC522 handle struct.
+    @param bufferATQA (Output) Pointer to store the ATQA response.
+ */
 MFRC522_Status_t MFRC522_RequestA(MFRC522_Handle_t *handle, uint8_t *bufferATQA)
 {
     MFRC522_Status_t status = MFRC522_OK;
@@ -348,6 +413,11 @@ MFRC522_Status_t MFRC522_RequestA(MFRC522_Handle_t *handle, uint8_t *bufferATQA)
     return status;
 };
 
+/**
+    @brief Perform anti-collision detection to get the UID of a card.
+    @param handle Pointer to MFRC522 handle struct.
+    @param bufferUID (Output) Pointer to store the 4-byte UID of the card.
+ */
 MFRC522_Status_t MFRC522_AntiCollision(MFRC522_Handle_t *handle, uint8_t *serNum)
 {
     MFRC522_Status_t status = MFRC522_OK;
@@ -488,15 +558,25 @@ MFRC522_Status_t MFRC522_AntiCollision(MFRC522_Handle_t *handle, uint8_t *serNum
 }
 
 
-/*
-    Convienience functions
-*/
+/**************************
+    Convenience functions
+**************************/
+/**
+    @brief Check if a card is present.
+    @param handle Pointer to MFRC522 handle struct.
+    @return MFRC522_OK if a card is present, otherwise an error code.
+ */
 MFRC522_Status_t MFRC522_IsCardPresent(MFRC522_Handle_t *handle)
 {
     uint8_t atqa[2] = {0};
     return MFRC522_RequestA(handle, atqa);
 }
 
+/**
+    @brief Read the UID of a card. This is a convenience function that calls AntiCollision and extracts the UID.
+    @param handle Pointer to MFRC522 handle struct. The read UID will be stored in handle->uid.
+    @return MFRC522_OK if the UID was successfully read, otherwise an error code.
+ */
 MFRC522_Status_t MFRC522_ReadUID(MFRC522_Handle_t *handle)
 {
     uint8_t _uid[5] = {0}; // 4 bytes UID + 1 byte BCC
@@ -507,17 +587,25 @@ MFRC522_Status_t MFRC522_ReadUID(MFRC522_Handle_t *handle)
     return status;
 }
 
-/* Testing */
-bool MFRC522_Exec_SelfTest(MFRC522_Handle_t *handle, uint8_t *selfTestResult)
+/**************************
+        Testing
+**************************/
+/**
+    @brief Execute the self-test of the MFRC522.
+    @param handle Pointer to MFRC522 handle struct.
+    @param selfTestResult (Output) Pointer to store the 64-byte self-test result.
+    @return MFRC522_OK if self-test passed, otherwise an error code.
+ */
+MFRC522_Status_t MFRC522_Exec_SelfTest(MFRC522_Handle_t *handle, uint8_t *selfTestResult)
 {
     if (handle == NULL || selfTestResult == NULL) {
-        return false;
+        return MFRC522_ERROR;
     }
 
     // Soft reset
     HAL_StatusTypeDef ret = MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_SoftReset);
     if(ret != HAL_OK) {
-        return false;
+        return MFRC522_ERROR;
     }
     // Wait for reset to complete: poll CommandReg[4] (PowerDown bit) or just wait 50ms
     HAL_Delay(50);
@@ -571,5 +659,5 @@ bool MFRC522_Exec_SelfTest(MFRC522_Handle_t *handle, uint8_t *selfTestResult)
     MFRC522_WriteRegister(handle, MFRC522_ModeReg, 0x3D);
     MFRC522_Enable_Antenna(handle);
 
-    return passed;
+    return  passed ? MFRC522_OK : MFRC522_ERROR;
 }
