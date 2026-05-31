@@ -292,9 +292,9 @@ MFRC522_Status_t MFRC522_CalculateCRC(MFRC522_Handle_t *handle, uint8_t *data, u
         }
     }
 
-    // CRC result is in FIFO
-    if (MFRC522_ReadRegister(handle, MFRC522_FIFODataReg, &out[0]) != HAL_OK ||
-        MFRC522_ReadRegister(handle, MFRC522_FIFODataReg, &out[1]) != HAL_OK) {
+    // CRC result is in CRCResultRegL / CRCResultRegH
+    if (MFRC522_ReadRegister(handle, MFRC522_CRCResultRegL, &out[0]) != HAL_OK ||
+        MFRC522_ReadRegister(handle, MFRC522_CRCResultRegH, &out[1]) != HAL_OK) {
         status = MFRC522_ERROR;
         goto CalculateCRC_End;
     }
@@ -421,10 +421,16 @@ MFRC522_Status_t MFRC522_RequestA(MFRC522_Handle_t *handle, uint8_t *bufferATQA)
 MFRC522_Status_t MFRC522_AntiCollision(MFRC522_Handle_t *handle, uint8_t *serNum)
 {
     MFRC522_Status_t status = MFRC522_OK;
+
+    if ((handle == NULL) || (serNum == NULL)) {
+        return MFRC522_INVALID;
+    }
+
     DEBUG_LOG("Anti Collision\r\n");
     MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_Idle);
     MFRC522_WriteRegister(handle, MFRC522_CommIrqReg, 0x7F);      // Clear IRQs
     MFRC522_WriteRegister(handle, MFRC522_FIFOLevelReg, 0x80);   // Flush FIFO
+    MFRC522_ClearBitMask(handle, MFRC522_CollReg, 0x80);         // ValuesAfterColl = 0
 
     MFRC522_WriteRegister(handle, MFRC522_FIFODataReg, PICC_CMD_Sel_CL1); // 1) Assign SEL cascade level
     MFRC522_WriteRegister(handle, MFRC522_FIFODataReg, 0x20); // 2) assign NVB
@@ -501,28 +507,59 @@ MFRC522_Status_t MFRC522_AntiCollision(MFRC522_Handle_t *handle, uint8_t *serNum
     selectBuffer[5] = serNum[3];
     selectBuffer[6] = serNum[4]; // BCC
 
+    uint8_t crc[2] = {0};
+    if (MFRC522_CalculateCRC(handle, selectBuffer, 7, crc) != MFRC522_OK) {
+        DEBUG_LOG("Failed to calculate CRC for Select\r\n");
+        status = MFRC522_ERROR;
+        goto AntiCollision_End;
+    }
+
+    uint8_t selectFrame[9] = {
+        selectBuffer[0], selectBuffer[1], selectBuffer[2], selectBuffer[3], selectBuffer[4],
+        selectBuffer[5], selectBuffer[6], crc[0], crc[1]
+    };
+
     MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_Idle);
     MFRC522_WriteRegister(handle, MFRC522_CommIrqReg, 0x7F);      // Clear IRQs
     MFRC522_WriteRegister(handle, MFRC522_FIFOLevelReg, 0x80);   // Flush FIFO
-
-    // | SEL CLn | NVB | UID CLn + BCC | CRC_A |
-    MFRC522_WriteRegister(handle, MFRC522_FIFODataReg, selectBuffer[0]); // SEL
-    MFRC522_WriteRegister(handle, MFRC522_FIFODataReg, selectBuffer[1]); // NVB
-    for (uint8_t i = 0; i < 5U; i++) {
-        MFRC522_WriteRegister(handle, MFRC522_FIFODataReg, selectBuffer[i + 2]); // UID CLn + BCC
-    }
-
-    uint8_t crc[2] = {0};
-    MFRC522_CalculateCRC(handle, selectBuffer, 7, crc);
-    MFRC522_WriteRegister(handle, MFRC522_FIFODataReg, crc[0]);
-    MFRC522_WriteRegister(handle, MFRC522_FIFODataReg, crc[1]);
-
+    MFRC522_WriteRegisterLong(handle, MFRC522_FIFODataReg, selectFrame, sizeof(selectFrame));
     MFRC522_WriteRegister(handle, MFRC522_BitFramingReg, 0x00); // 8 bits for SEL + NVB + UID + BCC + CRC_A
 
-    MFRC522_ReadRegister(handle, MFRC522_FIFOLevelReg, &fifoLevel);
+    MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_Transceive);
+    MFRC522_SetBitMask(handle, MFRC522_BitFramingReg, 0x80); // Transmit all and receive SAK
 
+    timeout = HAL_GetTick() + 100U;
+
+    uint8_t irq = 0;
+    while (1) {
+        MFRC522_ReadRegister(handle, MFRC522_CommIrqReg, &irq);
+        if (irq & 0x30U) { // RxIRq or IdleIRq
+            break;
+        }
+        if (HAL_GetTick() > timeout || (irq & 0x01U)) { // Timeout
+            uint8_t errTimeout = 0;
+            MFRC522_ReadRegister(handle, MFRC522_ErrorReg, &errTimeout);
+            MFRC522_ClearBitMask(handle, MFRC522_BitFramingReg, 0x80U);
+            DEBUG_LOG("Timeout waiting for SAK (ComIrq=0x%02X Error=0x%02X)\r\n", irq, errTimeout);
+            status = MFRC522_TIMEOUT;
+            goto AntiCollision_End;
+        }
+    }
+
+    MFRC522_ClearBitMask(handle, MFRC522_BitFramingReg, 0x80U);
+
+    MFRC522_ReadRegister(handle, MFRC522_ErrorReg, &err);
+    if (err & 0x13U) // BufferOvfl, ParityErr, ProtocolErr
+    {
+        DEBUG_LOG("Error during Select: 0x%02X\r\n", err);
+        status = MFRC522_ERROR;
+        goto AntiCollision_End;
+    }
+
+
+    MFRC522_ReadRegister(handle, MFRC522_FIFOLevelReg, &fifoLevel);
     // 13) Receive SAK
-    if (fifoLevel >= 1) {
+    if (fifoLevel >= 1U) {
         uint8_t SAK = 0;
         MFRC522_ReadRegister(handle, MFRC522_FIFODataReg, &SAK);
         
@@ -535,11 +572,7 @@ MFRC522_Status_t MFRC522_AntiCollision(MFRC522_Handle_t *handle, uint8_t *serNum
             goto AntiCollision_End;
         }
 
-        uint8_t isISOCompliant = (SAK & 0x20U) != 0; // ISO/IEC 14443-4 compliant if bit 6 is set
-        if (!isISOCompliant) {
-            DEBUG_LOG("Card does not support ISO/IEC 14443-4\r\n");
-            status = MFRC522_ERROR;
-        }
+        status = MFRC522_OK;
         goto AntiCollision_End;
     }
 

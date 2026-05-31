@@ -106,7 +106,7 @@ int main(void)
   MFRC522_Init(&mfrc522, &hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin, MFRC522_RST_GPIO_Port, MFRC522_RST_Pin);
 
   // Run Example
-  Examples_Run(&mfrc522, Example_ReadUID);
+  Examples_Run(&mfrc522, Example_ReadUIDIRQ);
   /* USER CODE END 2 */
 
   /* Infinite loop */
