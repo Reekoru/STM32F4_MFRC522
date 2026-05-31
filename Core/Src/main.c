@@ -25,8 +25,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "stm32f4xx_hal_gpio.h"
-#include "stm32f4xx_hal_tim.h"
 #include "utils.h"
+#include "examples.h" 
 
 /* USER CODE END Includes */
 
@@ -48,8 +48,6 @@
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi2;
 
-TIM_HandleTypeDef htim2;
-
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
@@ -62,7 +60,6 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_SPI2_Init(void);
-static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -103,58 +100,19 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_SPI2_Init();
-  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
+  // Initialize MFRC522
   MFRC522_Init(&mfrc522, &hspi2, SPI2_CS_GPIO_Port, SPI2_CS_Pin, MFRC522_RST_GPIO_Port, MFRC522_RST_Pin);
 
-  HAL_Delay(50);
-
-  uint8_t mfrc522Version = 0;
-  HAL_StatusTypeDef ret = MFRC522_ReadRegister(&mfrc522, MFRC522_VersionReg, &mfrc522Version);
-
-  if (ret == HAL_OK) {
-      DEBUG_LOG("MFRC522 Version: 0x%02X\r\n", mfrc522Version);
-      if ((mfrc522Version != 0x91U) && (mfrc522Version != 0x92U)) {
-        DEBUG_LOG("Unexpected version value. Check SPI pins/wiring.\r\n");
-      }
-  } else {
-      DEBUG_LOG("Failed to read MFRC522 version\r\n");
-  }
-
-  uint8_t selfTestResult[64] = {0};
-  if(MFRC522_Exec_SelfTest(&mfrc522, selfTestResult)) 
-  {
-    DEBUG_LOG("MFRC522 Self Test Passed. Result:\r\n");
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-  } else 
-  {
-    DEBUG_LOG("MFRC522 Self Test Failed.\r\n");
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-  }
+  // Run Example
+  Examples_Run(&mfrc522, Example_ReadUIDIRQ);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    if(MFRC522_IsCardPresent(&mfrc522) == MFRC522_OK)
-    {
-      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
-      if(MFRC522_ReadUID(&mfrc522) == MFRC522_OK) {
-        DEBUG_LOG("Card UID: %02X %02X %02X %02X\r\n", mfrc522.uid[0], mfrc522.uid[1], mfrc522.uid[2], mfrc522.uid[3]);
-      } else {
-        DEBUG_LOG("Failed to read card UID\r\n");
-      }
-      HAL_Delay(1000);
-      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
-      HAL_Delay(200);
-    }
-    else
-    {
-      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
-      HAL_Delay(50);
-    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -248,51 +206,6 @@ static void MX_SPI2_Init(void)
 }
 
 /**
-  * @brief TIM2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM2_Init(void)
-{
-
-  /* USER CODE BEGIN TIM2_Init 0 */
-
-  /* USER CODE END TIM2_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM2_Init 1 */
-
-  /* USER CODE END TIM2_Init 1 */
-  htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 41;
-  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 999;
-  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM2_Init 2 */
-
-  /* USER CODE END TIM2_Init 2 */
-
-}
-
-/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -368,6 +281,16 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : MFRC522_EXTI_Pin */
+  GPIO_InitStruct.Pin = MFRC522_EXTI_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(MFRC522_EXTI_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 

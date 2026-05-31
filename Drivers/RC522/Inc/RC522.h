@@ -129,6 +129,7 @@ MFRC522_Status_t MFRC522_CalculateCRC(MFRC522_Handle_t *handle, uint8_t* data, u
 **********************************/
 MFRC522_Status_t MFRC522_RequestA(MFRC522_Handle_t *handle, uint8_t *bufferATQA);
 MFRC522_Status_t MFRC522_AntiCollistion(MFRC522_Handle_t *handle, uint8_t *bufferUID);
+MFRC522_Status_t MFRC522_SendREQA(MFRC522_Handle_t *handle);
 
 /*
     Convinience functions

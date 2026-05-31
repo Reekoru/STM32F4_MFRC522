@@ -253,6 +253,19 @@ MFRC522_Status_t MFRC522_CalculateCRC(MFRC522_Handle_t *handle, uint8_t *data, u
 /***********************************************************
  PICC functions
 ***********************************************************/
+MFRC522_Status_t MFRC522_SendREQA(MFRC522_Handle_t *handle)
+{
+    MFRC522_Enable_Antenna(handle);
+    MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_Idle);
+    MFRC522_WriteRegister(handle, MFRC522_CommIrqReg, 0x7F);
+    MFRC522_WriteRegister(handle, MFRC522_FIFOLevelReg, 0x80);
+    MFRC522_WriteRegister(handle, MFRC522_FIFODataReg, PICC_CMD_REQA);
+    MFRC522_WriteRegister(handle, MFRC522_BitFramingReg, 0x07);
+    MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_Transceive);
+    MFRC522_SetBitMask(handle, MFRC522_BitFramingReg, 0x80);
+
+    return MFRC522_OK;
+}
 MFRC522_Status_t MFRC522_RequestA(MFRC522_Handle_t *handle, uint8_t *bufferATQA)
 {
     MFRC522_Status_t status = MFRC522_OK;
@@ -542,6 +555,8 @@ bool MFRC522_Exec_SelfTest(MFRC522_Handle_t *handle, uint8_t *selfTestResult)
     MFRC522_WriteRegister(handle, MFRC522_AutoTestReg, 0x00);
 
     bool passed = (memcmp(test_result, mfrc522_v2_self_test, 64) == 0);
+
+    memcpy(selfTestResult, test_result, 64);
 
     // Restore STATE
     MFRC522_WriteRegister(handle, MFRC522_CommandReg, MFRC522_CMD_Idle);
