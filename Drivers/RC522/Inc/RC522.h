@@ -75,7 +75,7 @@ typedef enum {
     MFRC522_CMD_SoftReset = 0x0F
 } MFRC522_Command_t;
 
-// https://wg8.de/wg8n1496_17n3613_Ballot_FCD14443-3.pdf
+// https://wg8.de/wg8n1496_17n3613_Ballot_FCD14443-3.pdf or https://www.nxp.com/docs/en/data-sheet/MF1S50YYX_V1.pdf
 typedef enum {
     PICC_CMD_REQA = 0x26,
     PICC_CMD_WUPA = 0x52,
@@ -88,7 +88,7 @@ typedef enum {
     PICC_CMD_Sel_CL3 = 0x97,
 } PICC_Command_t;
 
-// https://www.nxp.com/docs/en/data-sheet/MF1S50YYX_V1.pdf
+// https://www.nxp.com/docs/en/data-sheet/MF1S50YYX_V1.pdf - MIFARE Classic command: Section 9.1
 typedef enum
 {
     MIFARE_CMD_AUTH_KEY_A = 0x60,
@@ -102,7 +102,6 @@ typedef enum
     MIFARE_CMD_TRANSFER = 0xB0,
 } MIFARE_Command_t;
 
-
 typedef enum {
     MFRC522_OK,
     MFRC522_ERROR,
@@ -110,8 +109,20 @@ typedef enum {
     MFRC522_TIMEOUT,
     MFRC522_INVALID,
     MFRC522_CRC_WRONG,
-    MFRC522_NOT_ISO_COMPLIANT
+    MFRC522_NOT_ISO_COMPLIANT,
+    MFRC522_NOT_AUTHED,
+    MFRC522_NO_ROOM
 } MFRC522_Status_t;
+
+typedef enum {
+    PICC_TYPE_UNKNOWN = 0XFF,
+    PICC_TYPE_ULTRALIGHT_C_CL2 = 0x00,
+    PICC_TYPE_MIFARE_1K = 0x08,
+    PICC_TYPE_MIFARE_4K = 0x18,
+    PICC_TYPE_MIFARE_PLUS_2K = 0X10,
+    PICC_TYPE_MIFARE_PLUS_4K = 0x11,
+    PICC_TYPE_MIFARE_PLUS_2K_SE = 0x20
+} PICC_Type_t;
 
 typedef struct {
     SPI_HandleTypeDef *hspi;
@@ -120,19 +131,29 @@ typedef struct {
     GPIO_TypeDef *rstPort;
     uint16_t rstPin;
     uint8_t uid[4];
+    PICC_Type_t piccType;
 } MFRC522_Handle_t;
 
 MFRC522_Status_t MFRC522_Init(MFRC522_Handle_t *handle, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cdPort, uint16_t cdPin, GPIO_TypeDef *rstPort, uint16_t rstPin);
 
-HAL_StatusTypeDef MFRC522_WriteRegister(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t value);
-HAL_StatusTypeDef MFRC522_WriteRegisterLong(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* data, uint16_t length);
-HAL_StatusTypeDef MFRC522_ReadRegister(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* out);
-HAL_StatusTypeDef MFRC522_ReadRegisterLong(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* out, uint16_t length);
-HAL_StatusTypeDef MFRC522_SetBitMask(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t mask);
-HAL_StatusTypeDef MFRC522_ClearBitMask(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t mask);
+/*******************************
+    Low level register access
+*******************************/
+MFRC522_Status_t MFRC522_WriteRegister(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t value);
+MFRC522_Status_t MFRC522_WriteRegisterLong(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* data, uint16_t length);
+MFRC522_Status_t MFRC522_ReadRegister(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* out);
+MFRC522_Status_t MFRC522_ReadRegisterLong(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* out, uint16_t length);
+MFRC522_Status_t MFRC522_SetBitMask(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t mask);
+MFRC522_Status_t MFRC522_ClearBitMask(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t mask);
+
+/*****************************
+    MFRC522 operations
+******************************/
 MFRC522_Status_t MFRC522_Enable_Antenna(MFRC522_Handle_t *handle);
 MFRC522_Status_t MFRC522_Disable_Antenna(MFRC522_Handle_t *handle);
 MFRC522_Status_t MFRC522_CalculateCRC(MFRC522_Handle_t *handle, uint8_t* data, uint16_t length, uint8_t* out);
+MFRC522_Status_t MFRC522_CheckCRC(MFRC522_Handle_t *handle, uint8_t* data, uint16_t length);
+MFRC522_Status_t MFRC522_DisableCrypto1(MFRC522_Handle_t *handle);
 
 /*********************************
     Communication with PIC
@@ -140,18 +161,21 @@ MFRC522_Status_t MFRC522_CalculateCRC(MFRC522_Handle_t *handle, uint8_t* data, u
 MFRC522_Status_t MFRC522_RequestA(MFRC522_Handle_t *handle, uint8_t *bufferATQA);
 MFRC522_Status_t MFRC522_AntiCollistion(MFRC522_Handle_t *handle, uint8_t *bufferUID);
 MFRC522_Status_t MFRC522_SendREQA(MFRC522_Handle_t *handle);
-MFRC522_Status_t MFRC522_Tranceive(MFRC522_Handle_t *handle, uint8_t *sendData, uint16_t sendLen, uint8_t *backData, uint16_t *backLen);
-MFRC522_Status_t MFRC522_Tranceive_Command(MFRC522_Handle_t *handle, uint8_t cmd, uint8_t *sendData, uint16_t sendLen, uint8_t *backData, uint16_t *backLen);
+MFRC522_Status_t MFRC522_Execute_Command(MFRC522_Handle_t *handle, uint8_t cmd, uint8_t *txBuffer, uint16_t txBufferLength, uint8_t bitFraming);
+MFRC522_Status_t MFRC522_Tranceive(MFRC522_Handle_t *handle, uint8_t *txBuffer, uint16_t txBufferLength, uint8_t *rxBuffer, uint8_t rxBufferLength);
 
 /*****************************
     MIFARE Classic functions
 *****************************/
+
+// https://www.nxp.com/docs/en/data-sheet/MF1S50YYX_V1.pdf - MIFARE Classic Commands: Section 8.6
 MFRC522_Status_t MFRC522_MifareAuth(MFRC522_Handle_t *handle, MIFARE_Command_t cmd, uint8_t blockAddr, uint8_t *key, uint8_t *uid);
+MFRC522_Status_t MFRC522_MifareRead(MFRC522_Handle_t *handle, uint8_t blockAddr, uint8_t *rxData);
+MFRC522_Status_t MFRC522_MifareWrite(MFRC522_Handle_t *handle, uint8_t blockAddr, uint8_t *data);
 
 /**************************
     Convenience functions
 **************************/
-
 MFRC522_Status_t MFRC522_IsCardPresent(MFRC522_Handle_t *handle);
 MFRC522_Status_t MFRC522_ReadUID(MFRC522_Handle_t *handle);
 MFRC522_Status_t MFRC522_Exec_SelfTest(MFRC522_Handle_t *handle, uint8_t *selfTestResult);
