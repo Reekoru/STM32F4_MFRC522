@@ -105,18 +105,52 @@ void _ReadWrite(MFRC522_Handle_t *mfrc522)
     DEBUG_LOG("Running ReadWrite Example\r\n");
     while(1)
     {
+        MFRC522_Status_t opStatus = MFRC522_OK;
+
         if(MFRC522_IsCardPresent(mfrc522) != MFRC522_OK) continue;
         if(MFRC522_ReadUID(mfrc522) != MFRC522_OK) continue;
         
         uint8_t block = 4;
         uint8_t keyA[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // Default key for MIFARE Classic
-        MFRC522_Status_t status = MFRC522_MifareAuth(mfrc522, MIFARE_CMD_AUTH_KEY_A, block, keyA, mfrc522->uid);
-        
-        if (status == MFRC522_OK) {
-            DEBUG_LOG("Authentication successful for block %d\r\n", block);
-        } else {
-            DEBUG_LOG("Authentication failed for block %d: %d\r\n", block, status);
+        opStatus = MFRC522_MifareAuth(mfrc522, MIFARE_CMD_AUTH_KEY_A, block, keyA, mfrc522->uid);
+        if(opStatus != MFRC522_OK) 
+        {
+            DEBUG_LOG("Authentication failed for block %d\r\n", block);
+            goto ReadWrite_Cleanup;
         }
+
+        DEBUG_LOG("Authentication successful for block %d\r\n", block);
+        uint8_t readBuffer[16] = {0}; // 16 bytes data
+
+        opStatus = MFRC522_MifareRead(mfrc522, block, readBuffer);
+        if (opStatus != MFRC522_OK) {
+            DEBUG_LOG("Failed to read from block %d\r\n", block);
+            goto ReadWrite_Cleanup;
+        }
+    
+        DEBUG_LOG_HEX("Data read from block:", readBuffer, 16);
+
+        // Increment array values by 1 for writing back to the card
+        for (int i = 0; i < 16; i++) {
+            readBuffer[i]++;
+
+            if(readBuffer[i] != 0) { // Check for overflow
+                break;
+            }
+        }
+
+        opStatus = MFRC522_MifareWrite(mfrc522, block, readBuffer);
+        if (opStatus != MFRC522_OK) {
+            DEBUG_LOG("Failed to write to block %d\r\n", block);
+            goto ReadWrite_Cleanup;
+        }
+
+        DEBUG_LOG("Data written to block %d\r\n", block);
+
+        ReadWrite_Cleanup:
+        MFRC522_DisableCrypto1(mfrc522);
+        MFRC522_WriteRegister(mfrc522, MFRC522_CommandReg, MFRC522_CMD_Idle);
+        HAL_Delay(20);
     }
 }
 
