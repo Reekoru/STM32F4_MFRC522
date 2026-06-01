@@ -88,6 +88,21 @@ typedef enum {
     PICC_CMD_Sel_CL3 = 0x97,
 } PICC_Command_t;
 
+// https://www.nxp.com/docs/en/data-sheet/MF1S50YYX_V1.pdf
+typedef enum
+{
+    MIFARE_CMD_AUTH_KEY_A = 0x60,
+    MIFARE_CMD_AUTH_KEY_B = 0x61,
+
+    MIFARE_CMD_READ = 0x30,
+    MIFARE_CMD_WRITE = 0xA0,
+    MIFARE_CMD_DECREMENT = 0xC0,
+    MIFARE_CNDMD_INCREMENT = 0xC1,
+    MIFARE_CMD_RESTORE = 0xC2,
+    MIFARE_CMD_TRANSFER = 0xB0,
+} MIFARE_Command_t;
+
+
 typedef enum {
     MFRC522_OK,
     MFRC522_ERROR,
@@ -111,33 +126,34 @@ MFRC522_Status_t MFRC522_Init(MFRC522_Handle_t *handle, SPI_HandleTypeDef *hspi,
 
 HAL_StatusTypeDef MFRC522_WriteRegister(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t value);
 HAL_StatusTypeDef MFRC522_WriteRegisterLong(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* data, uint16_t length);
-
 HAL_StatusTypeDef MFRC522_ReadRegister(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* out);
 HAL_StatusTypeDef MFRC522_ReadRegisterLong(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t* out, uint16_t length);
-
 HAL_StatusTypeDef MFRC522_SetBitMask(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t mask);
 HAL_StatusTypeDef MFRC522_ClearBitMask(MFRC522_Handle_t *handle, MFRC522_Register_t reg, uint8_t mask);
-
 MFRC522_Status_t MFRC522_Enable_Antenna(MFRC522_Handle_t *handle);
 MFRC522_Status_t MFRC522_Disable_Antenna(MFRC522_Handle_t *handle);
-
-
 MFRC522_Status_t MFRC522_CalculateCRC(MFRC522_Handle_t *handle, uint8_t* data, uint16_t length, uint8_t* out);
 
 /*********************************
-    Basic communication with PIC
+    Communication with PIC
 **********************************/
 MFRC522_Status_t MFRC522_RequestA(MFRC522_Handle_t *handle, uint8_t *bufferATQA);
 MFRC522_Status_t MFRC522_AntiCollistion(MFRC522_Handle_t *handle, uint8_t *bufferUID);
 MFRC522_Status_t MFRC522_SendREQA(MFRC522_Handle_t *handle);
+MFRC522_Status_t MFRC522_Tranceive(MFRC522_Handle_t *handle, uint8_t *sendData, uint16_t sendLen, uint8_t *backData, uint16_t *backLen);
+MFRC522_Status_t MFRC522_Tranceive_Command(MFRC522_Handle_t *handle, uint8_t cmd, uint8_t *sendData, uint16_t sendLen, uint8_t *backData, uint16_t *backLen);
 
-/*
-    Convinience functions
-*/
+/*****************************
+    MIFARE Classic functions
+*****************************/
+MFRC522_Status_t MFRC522_MifareAuth(MFRC522_Handle_t *handle, MIFARE_Command_t cmd, uint8_t blockAddr, uint8_t *key, uint8_t *uid);
+
+/**************************
+    Convenience functions
+**************************/
 
 MFRC522_Status_t MFRC522_IsCardPresent(MFRC522_Handle_t *handle);
 MFRC522_Status_t MFRC522_ReadUID(MFRC522_Handle_t *handle);
-
-bool MFRC522_Exec_SelfTest(MFRC522_Handle_t *handle, uint8_t *selfTestResult);
+MFRC522_Status_t MFRC522_Exec_SelfTest(MFRC522_Handle_t *handle, uint8_t *selfTestResult);
 
 #endif /* _MFRC522_H */
